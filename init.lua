@@ -84,6 +84,14 @@ I hope you enjoy your Neovim journey,
 P.S. You can delete this when you're done too. It's your config now! :)
 --]]
 
+vim.g.loaded_netrw = 1
+vim.g.loaded_netrwPlugin = 1
+
+-- optionally enable 24-bit colour
+vim.opt.termguicolors = true
+
+-- empty setup using defaults
+
 -- Set <space> as the leader key
 -- See `:help mapleader`
 --  NOTE: Must happen before plugins are loaded (otherwise wrong leader will be used)
@@ -91,7 +99,7 @@ vim.g.mapleader = ' '
 vim.g.maplocalleader = ' '
 
 -- Set to true if you have a Nerd Font installed and selected in the terminal
-vim.g.have_nerd_font = false
+vim.g.have_nerd_font = true
 
 -- [[ Setting options ]]
 -- See `:help vim.opt`
@@ -116,6 +124,7 @@ vim.opt.showmode = false
 --  See `:help 'clipboard'`
 vim.schedule(function()
   vim.opt.clipboard = 'unnamedplus'
+  vim.g.clipboard = 'osc52'
 end)
 
 -- Enable break indent
@@ -240,14 +249,12 @@ vim.opt.rtp:prepend(lazypath)
 require('lazy').setup({
   -- NOTE: Plugins can be added with a link (or for a github repo: 'owner/repo' link).
   'tpope/vim-sleuth', -- Detect tabstop and shiftwidth automatically
-
   -- NOTE: Plugins can also be added by using a table,
   -- with the first argument being the link and the following
   -- keys can be used to configure plugin behavior/loading/etc.
   --
   -- Use `opts = {}` to automatically pass options to a plugin's `setup()` function, forcing the plugin to be loaded.
   --
-
   -- Alternatively, use `config = function() ... end` for full control over the configuration.
   -- If you prefer to call `setup` explicitly, use:
   --    {
@@ -258,7 +265,6 @@ require('lazy').setup({
   --            })
   --        end,
   --    }
-  --
   -- Here is a more advanced example where we pass configuration
   -- options to `gitsigns.nvim`.
   --
@@ -275,7 +281,6 @@ require('lazy').setup({
       },
     },
   },
-
   -- NOTE: Plugins can also be configured to run Lua code when they are loaded.
   --
   -- This is often very useful to both group configuration, as well as handle
@@ -289,7 +294,7 @@ require('lazy').setup({
   --
   -- Then, because we use the `opts` key (recommended), the configuration runs
   -- after the plugin has been loaded as `require(MODULE).setup(opts)`.
-
+  --
   { -- Useful plugin to show you pending keybinds.
     'folke/which-key.nvim',
     event = 'VimEnter', -- Sets the loading event to 'VimEnter'
@@ -651,7 +656,7 @@ require('lazy').setup({
       --  By default, Neovim doesn't support everything that is in the LSP specification.
       --  When you add blink.cmp, luasnip, etc. Neovim now has *more* capabilities.
       --  So, we create new capabilities with blink.cmp, and then broadcast that to the servers.
-      local capabilities = require('blink.cmp').get_lsp_capabilities()
+      -- local capabilities = require('blink.cmp').get_lsp_capabilities()
 
       -- Enable the following language servers
       --  Feel free to add/remove any LSPs that you want here. They will automatically be installed.
@@ -665,7 +670,31 @@ require('lazy').setup({
       local servers = {
         -- clangd = {},
         -- gopls = {},
-        -- pyright = {},
+        pyright = {
+          settings = {
+            pyright = {
+              disableOrganizeImports = true, -- Using Ruff
+            },
+            python = {
+              analysis = {
+                autoSearchPaths = true, -- scan venv + extraPaths
+                diagnosticMode = 'workspace', -- not just "openFilesOnly"
+                typeCheckingMode = 'basic', -- or "strict"
+                useLibraryCodeForTypes = true, -- follow into site-packages
+                indexing = true, -- speeds up big projects
+                extraPaths = { 'src', 'third_party' }, -- matches pyrightconfig
+              },
+              venvPath = '.',
+              venv = os.getenv 'VIRTUAL_ENV' and vim.fn.fnamemodify(os.getenv 'VIRTUAL_ENV', ':t') or nil,
+            },
+          },
+        },
+        ruff = {
+          settings = {
+            args = {},
+          },
+        },
+
         -- rust_analyzer = {},
         -- ... etc. See `:help lspconfig-all` for a list of all the pre-configured LSPs
         --
@@ -691,6 +720,11 @@ require('lazy').setup({
           },
         },
       }
+      ---@type MasonLspconfigSettings
+      ---@diagnostic disable-next-line: missing-fields
+      require('mason-lspconfig').setup {
+        automatic_enable = vim.tbl_keys(servers or {}),
+      }
 
       -- Ensure the servers and tools above are installed
       --
@@ -708,23 +742,32 @@ require('lazy').setup({
       local ensure_installed = vim.tbl_keys(servers or {})
       vim.list_extend(ensure_installed, {
         'stylua', -- Used to format Lua code
+        --'pyright',
+        'ruff',
+        'ruff-lsp',
+        'debugpy',
+        'taplo',
       })
       require('mason-tool-installer').setup { ensure_installed = ensure_installed }
 
-      require('mason-lspconfig').setup {
-        ensure_installed = {}, -- explicitly set to an empty table (Kickstart populates installs via mason-tool-installer)
-        automatic_installation = false,
-        handlers = {
-          function(server_name)
-            local server = servers[server_name] or {}
-            -- This handles overriding only values explicitly passed
-            -- by the server configuration above. Useful when disabling
-            -- certain features of an LSP (for example, turning off formatting for ts_ls)
-            server.capabilities = vim.tbl_deep_extend('force', {}, capabilities, server.capabilities or {})
-            require('lspconfig')[server_name].setup(server)
-          end,
-        },
-      }
+      -- require('mason-lspconfig').setup {
+      --   ensure_installed = {}, -- explicitly set to an empty table (Kickstart populates installs via mason-tool-installer)
+      --   automatic_installation = false,
+      --   handlers = {
+      --     function(server_name)
+      --       local server = servers[server_name] or {}
+      --       -- This handles overriding only values explicitly passed
+      --       -- by the server configuration above. Useful when disabling
+      --       -- certain features of an LSP (for example, turning off formatting for ts_ls)
+      --       server.capabilities = vim.tbl_deep_extend('force', {}, capabilities, server.capabilities or {})
+      --       require('lspconfig')[server_name].setup(server)
+      --       vim.lsp.enable(server_name)
+      --     end,
+      --   },
+      -- }
+      for server_name, config in pairs(servers) do
+        vim.lsp.config(server_name, config)
+      end
     end,
   },
 
@@ -754,6 +797,7 @@ require('lazy').setup({
         else
           return {
             timeout_ms = 500,
+            async = false,
             lsp_format = 'fallback',
           }
         end
@@ -762,7 +806,8 @@ require('lazy').setup({
         lua = { 'stylua' },
         -- Conform can also run multiple formatters sequentially
         -- python = { "isort", "black" },
-        --
+        python = { 'ruff_format' },
+        toml = { 'taplo' },
         -- You can use 'stop_after_first' to run the first available formatter from the list
         -- javascript = { "prettierd", "prettier", stop_after_first = true },
       },
@@ -842,7 +887,7 @@ require('lazy').setup({
       completion = {
         -- By default, you may press `<c-space>` to show the documentation.
         -- Optionally, set `auto_show = true` to show the documentation after a delay.
-        documentation = { auto_show = false, auto_show_delay_ms = 500 },
+        documentation = { auto_show = true, auto_show_delay_ms = 500 },
       },
 
       sources = {
@@ -861,7 +906,7 @@ require('lazy').setup({
       -- the rust implementation via `'prefer_rust_with_warning'`
       --
       -- See :h blink-cmp-config-fuzzy for more information
-      fuzzy = { implementation = 'lua' },
+      fuzzy = { implementation = 'prefer_rust_with_warning' },
 
       -- Shows a signature help window while you type arguments for a function
       signature = { enabled = true },
@@ -886,7 +931,8 @@ require('lazy').setup({
       -- Load the colorscheme here.
       -- Like many other themes, this one has different styles, and you could load
       -- any other, such as 'tokyonight-storm', 'tokyonight-moon', or 'tokyonight-day'.
-      vim.cmd.colorscheme 'tokyonight-night'
+      vim.cmd.colorscheme 'vscode'
+      vim.o.background = 'dark'
     end,
   },
 
@@ -947,6 +993,21 @@ require('lazy').setup({
         additional_vim_regex_highlighting = { 'ruby' },
       },
       indent = { enable = true, disable = { 'ruby' } },
+      incremental_selection = {
+        enable = true,
+        keymaps = {
+          init_selection = 'gnn', -- set to `false` to disable one of the mappings
+          node_incremental = 'grn',
+          scope_incremental = 'grc',
+          node_decremental = 'grm',
+        },
+      },
+      fold = {
+        enable = true,
+      },
+      treesitter_context = {
+        enable = true,
+      },
     },
     -- There are additional nvim-treesitter modules that you can use to interact
     -- with nvim-treesitter. You should go explore a few and see what interests you:
@@ -966,8 +1027,8 @@ require('lazy').setup({
   --  Uncomment any of the lines below to enable them (you will need to restart nvim).
   --
   -- require 'kickstart.plugins.debug',
-  -- require 'kickstart.plugins.indent_line',
-  -- require 'kickstart.plugins.lint',
+  require 'kickstart.plugins.indent_line',
+  require 'kickstart.plugins.lint',
   -- require 'kickstart.plugins.autopairs',
   -- require 'kickstart.plugins.neo-tree',
   -- require 'kickstart.plugins.gitsigns', -- adds gitsigns recommend keymaps
@@ -976,7 +1037,8 @@ require('lazy').setup({
   --    This is the easiest way to modularize your config.
   --
   --  Uncomment the following line and add your plugins to `lua/custom/plugins/*.lua` to get going.
-  -- { import = 'custom.plugins' },
+  { import = 'custom.plugins' },
+  -- empty setup using defaults
   --
   -- For additional information with loading, sourcing and examples see `:help lazy.nvim-🔌-plugin-spec`
   -- Or use telescope!
@@ -1004,5 +1066,145 @@ require('lazy').setup({
   },
 })
 
+require('nvim-tree').setup {}
+
+require('image').enable()
+print(require('image').is_enabled()) -- bool
+
+-- Auto‑open nvim‑tree the moment Neovim start
+-- ── init.lua  (place it after your plugin manager & nvim‑tree setup) ──
+--local function open_nvim_tree(data)
+-----------------------------------------------------------------------
+-- 1. Only trigger when Neovim is started *without* a file or *with*
+--    a directory argument (e.g. `nvim` or `nvim .`).
+-----------------------------------------------------------------------
+-----------------------------------------------------------------------
+-- 2. Open nvim‑tree.
+-----------------------------------------------------------------------
+--require('nvim-tree.api').tree.open()
+--
+--  -----------------------------------------------------------------------
+--  -- 3. Close the original "blank" window so the tree is the *only* one.
+--  -----------------------------------------------------------------------
+--  for _, win in ipairs(vim.api.nvim_list_wins()) do
+--    local buf = vim.api.nvim_win_get_buf(win)
+--    local ft = vim.api.nvim_buf_get_option(buf, 'filetype')
+--    if ft ~= 'NvimTree' then -- the dummy start buffer
+--      vim.api.nvim_win_close(win, false) -- `false` = no force‑wipe
+--    end
+--  end
+--end
+
+local map = vim.api.nvim_set_keymap
+local opts = { noremap = true, silent = true }
+
+-- Move to previous/next
+map('n', '<A-,>', '<Cmd>BufferPrevious<CR>', opts)
+map('n', '<A-.>', '<Cmd>BufferNext<CR>', opts)
+
+-- Re-order to previous/next
+map('n', '<A-<>', '<Cmd>BufferMovePrevious<CR>', opts)
+map('n', '<A->>', '<Cmd>BufferMoveNext<CR>', opts)
+
+-- Goto buffer in position...
+map('n', '<A-1>', '<Cmd>BufferGoto 1<CR>', opts)
+map('n', '<A-2>', '<Cmd>BufferGoto 2<CR>', opts)
+map('n', '<A-3>', '<Cmd>BufferGoto 3<CR>', opts)
+map('n', '<A-4>', '<Cmd>BufferGoto 4<CR>', opts)
+map('n', '<A-5>', '<Cmd>BufferGoto 5<CR>', opts)
+map('n', '<A-6>', '<Cmd>BufferGoto 6<CR>', opts)
+map('n', '<A-7>', '<Cmd>BufferGoto 7<CR>', opts)
+map('n', '<A-8>', '<Cmd>BufferGoto 8<CR>', opts)
+map('n', '<A-9>', '<Cmd>BufferGoto 9<CR>', opts)
+map('n', '<A-0>', '<Cmd>BufferLast<CR>', opts)
+
+-- Pin/unpin buffer
+map('n', '<A-p>', '<Cmd>BufferPin<CR>', opts)
+
+-- Goto pinned/unpinned buffer
+--                 :BufferGotoPinned
+--                 :BufferGotoUnpinned
+
+-- Close buffer
+map('n', '<A-c>', '<Cmd>BufferClose<CR>', opts)
+
+-- Wipeout buffer
+--                 :BufferWipeout
+
+-- Close commands
+--                 :BufferCloseAllButCurrent
+--                 :BufferCloseAllButPinned
+--                 :BufferCloseAllButCurrentOrPinned
+--                 :BufferCloseBuffersLeft
+--                 :BufferCloseBuffersRight
+
+-- Magic buffer-picking mode
+map('n', '<C-p>', '<Cmd>BufferPick<CR>', opts)
+map('n', '<C-s-p>', '<Cmd>BufferPickDelete<CR>', opts)
+
+-- Sort automatically by...
+map('n', '<Space>bb', '<Cmd>BufferOrderByBufferNumber<CR>', opts)
+map('n', '<Space>bn', '<Cmd>BufferOrderByName<CR>', opts)
+map('n', '<Space>bd', '<Cmd>BufferOrderByDirectory<CR>', opts)
+map('n', '<Space>bl', '<Cmd>BufferOrderByLanguage<CR>', opts)
+map('n', '<Space>bw', '<Cmd>BufferOrderByWindowNumber<CR>', opts)
+
+local vim = vim
+local api = vim.api
+local M = {}
+-- function to create a list of commands and convert them to autocommands
+-------- This function is taken from https://github.com/norcalli/nvim_utils
+function M.nvim_create_augroups(definitions)
+  for group_name, definition in pairs(definitions) do
+    api.nvim_command('augroup ' .. group_name)
+    api.nvim_command 'autocmd!'
+    for _, def in ipairs(definition) do
+      local command = table.concat(vim.tbl_flatten { 'autocmd', def }, ' ')
+      api.nvim_command(command)
+    end
+    api.nvim_command 'augroup END'
+  end
+end
+
+local autoCommands = {
+  -- other autocommands
+  open_folds = {
+    { 'BufReadPost,FileReadPost', '*', 'normal zR' },
+  },
+}
+-- Tell Neovim to use Tree-sitter for folding
+vim.wo.foldmethod = 'expr'
+vim.wo.foldexpr = 'v:lua.vim.treesitter.foldexpr()'
+vim.wo.foldenable = false
+
+M.nvim_create_augroups(autoCommands)
+
+map('n', '<C-j>', '10j', opts)
+map('n', '<C-k>', '10k', opts)
+
+local _border = 'single'
+
+local function bordered_hover(_opts)
+  _opts = _opts or {}
+  return vim.lsp.buf.hover(vim.tbl_deep_extend('force', _opts, {
+    border = _border,
+  }))
+end
+
+local function bordered_signature_help(_opts)
+  _opts = _opts or {}
+  return vim.lsp.buf.signature_help(vim.tbl_deep_extend('force', _opts, {
+    border = _border,
+  }))
+end
+
+-- opts and _opts aren't the same
+vim.keymap.set('n', 'K', bordered_hover, opts)
+--vim.keymap.set("Mode", "Bind", bordered_signature_help, opts)
+-- Other:
+-- :BarbarEnable - enables barbar (enabled by default)
+-- :BarbarDisable - very bad command, should never be used
+
+--vim.api.nvim_create_autocmd('VimEnter', { callback = open_nvim_tree })
 -- The line beneath this is called `modeline`. See `:help modeline`
 -- vim: ts=2 sts=2 sw=2 et
