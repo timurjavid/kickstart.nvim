@@ -271,15 +271,15 @@ require('lazy').setup({
   -- See `:help gitsigns` to understand what the configuration keys do
   { -- Adds git related signs to the gutter, as well as utilities for managing changes
     'lewis6991/gitsigns.nvim',
-    opts = {
-      signs = {
-        add = { text = '+' },
-        change = { text = '~' },
-        delete = { text = '_' },
-        topdelete = { text = '‾' },
-        changedelete = { text = '~' },
-      },
-    },
+    --    opts = {
+    --      signs = {
+    --        #add = { text = '+' },
+    --        change = { text = '~' },
+    --        delete = { text = '_' },
+    --        topdelete = { text = '‾' },
+    --        changedelete = { text = '~' },
+    --      },
+    --    },
   },
   -- NOTE: Plugins can also be configured to run Lua code when they are loaded.
   --
@@ -791,7 +791,7 @@ require('lazy').setup({
         -- Disable "format_on_save lsp_fallback" for languages that don't
         -- have a well standardized coding style. You can add additional
         -- languages here or re-enable it for the disabled ones.
-        local disable_filetypes = { c = true, cpp = true }
+        local disable_filetypes = { c = true, cpp = true, python = false, json = false }
         if disable_filetypes[vim.bo[bufnr].filetype] then
           return nil
         else

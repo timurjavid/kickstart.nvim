@@ -64,4 +64,10 @@ return {
       { '<Leader>l', '<Cmd>MultipleCursorsLock<CR>', mode = { 'n', 'x' }, desc = 'Lock virtual cursors' },
     },
   },
+  {
+    'dstein64/nvim-scrollview',
+    init = function()
+      require('scrollview.contrib.gitsigns').setup()
+    end,
+  },
 }
